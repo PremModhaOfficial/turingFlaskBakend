@@ -49,7 +49,7 @@ class TuringMachine:
 
     @override
     def __repr__(self) -> str:
-        return f"""# currentStater{self.currentState} # pointer {self.pointer}"""
+        return f"# currentStater{self.currentState} # pointer {self.pointer}"
 
     def extract_from_table(self):
         if self.withLogs:
@@ -79,6 +79,8 @@ class TuringMachine:
             for var in vars:
                 print(f" STATE `{k} and VARIABLE {var}`")
                 inp = input("state replace direction\n").strip()
+                if type(inp) is dict:
+                    tt[k][str(var)] = f"{inp["m"]} {inp["r"]} {inp["d"]}"
                 if len(inp.split(" ")) == 3:
                     tt[k][str(var)] = inp
                 if len(inp) == 3:
@@ -142,7 +144,7 @@ class TuringMachine:
             [self.currentState, write, direction] = NextState.split(" ")
             print(NextState)
             if not self.currentState or self.currentState == "":
-                print(f"Empty SET")
+                print("Empty SET")
                 self.printTransitions()
                 return TuringResult.REJECTED, "".join(self.tape)
             if self.currentState in self.config["FinalStates"]:
