@@ -1,5 +1,5 @@
 from dataclasses import InitVar, dataclass, field
-from os import truncate
+from os import fork
 
 from icecream import ic
 
@@ -14,7 +14,7 @@ class TableEntry:
 
     def __str__(self) -> str:
         if self.state.strip():
-            return f"'{self.state} {self.repl} {self.dire}'"
+            return f"{self.state} {self.repl} {self.dire}"
         return "''"
 
     def __repr__(self) -> str:
@@ -46,6 +46,9 @@ class TransitionTable:
 
     def __str__(self):
         return f"TransitionTable: {self.rows}"
+
+    def get_entry(self, state: str, var: str):
+        return f"{self.rows[state].variable[var]}".split(" ")
 
     def parseFromJson(self, jsn: dict):
         states = list(jsn.keys())
@@ -100,30 +103,51 @@ class TransitionTable:
 
 @dataclass
 class TuringTape:
-    tape: str = ""
+    tape: list[str] = field(default_factory=list)
     blankSymbol: str = field(default="*")
-    pointer: int = field(default=0)
+    pointer: int = field(default=2)
 
     right_padding: int = field(default=0)
     left_padding: int = field(default=0)
 
+    def exec(self, repl, move):
+        self.tape[self.pointer] = repl
+        if move == "R":
+            self.seek_right()
+            return True
+        if move == "L":
+            self.seek_left()
+            return True
+        if move == "S":
+            return False
+
     def padd_tape(self):
-        padd = self.blankSymbol * 2
-        self.tape = padd + self.tape + padd
+        padd = list(self.blankSymbol * 2)
+        temp = []
+        temp.extend(padd)
+        temp.extend(self.tape)
+        temp.extend(padd)
+
+        self.tape = temp
+        del temp
 
         self.right_padding += 2
         self.left_padding += 2
 
     def seek_left(self):
         if self.pointer <= 2:
-            self.tape = self.blankSymbol + self.tape
+
+            temp = self.tape
+            self.tape = [self.blankSymbol]
+            self.tape.extend(temp)
+            del temp
             self.left_padding += 1
         else:
             self.pointer -= 1
 
     def seek_right(self):
         if self.pointer >= len(self.tape) - 2:
-            self.tape = self.tape + self.blankSymbol
+            self.tape.append(self.blankSymbol)
             self.right_padding += 1
         else:
             self.pointer += 1
@@ -142,18 +166,37 @@ class TuringMachine:
     transitionTable: TransitionTable = field(default_factory=TransitionTable)
     jsonTable: InitVar[dict[str, dict[str, str]] | None] = None
     tape: TuringTape = field(default_factory=TuringTape, init=True)
+    log: list[str] = field(default_factory=list, init=False)
 
     def fromJson(self, jsonTable):
         self.states, self.vars = self.transitionTable.make_table(jsonTable)
 
-    def set_tape(self, tape, blankSymbol="*"):
-        self.tape = TuringTape(tape, blankSymbol=blankSymbol)
+    def set_tape(self, tape: str, blankSymbol="*"):
+        self.tape = TuringTape(list(tape), blankSymbol=blankSymbol)
         self.tape.padd_tape()
+
+    def logg(self, active_state):
+        if not self.log:
+            self.log = []
+
+        log = f"{active_state}:{self.tape.tape}:{self.tape.pointer}"
+        self.log.append(log)
 
     def run(self):
         active_state = "q0"
 
-        while True:
+        # self.logg(active_state)
+        isRunning = True
+        while isRunning:
+            ic(active_state)
             symbol = self.tape.currebt_symbol()
-            ic(self.transitionTable.rows[active_state].variable[symbol])
-            break
+            try:
+                active_state, repl, move = self.transitionTable.get_entry(
+                    active_state, symbol
+                )
+                self.logg(active_state)
+            except ValueError:
+                ic("DONE")
+                break
+            isRunning = self.tape.exec(repl, move)
+            # break
