@@ -1,9 +1,4 @@
 from dataclasses import InitVar, dataclass, field
-from os import fork
-
-from icecream import ic
-
-# from icecream import ic
 
 
 @dataclass
@@ -106,6 +101,7 @@ class TuringTape:
     tape: list[str] = field(default_factory=list)
     blankSymbol: str = field(default="*")
     pointer: int = field(default=2)
+    accepted: bool = field(default=False, init=False)
 
     right_padding: int = field(default=0)
     left_padding: int = field(default=0)
@@ -120,6 +116,10 @@ class TuringTape:
             return True
         if move == "S":
             return False
+
+    def change_blank(self, new_blank):
+        self.tape = [new_blank if x == self.blankSymbol else x for x in self.tape]
+        self.blankSymbol = new_blank
 
     def padd_tape(self):
         padd = list(self.blankSymbol * 2)
@@ -152,8 +152,17 @@ class TuringTape:
         else:
             self.pointer += 1
 
-    def currebt_symbol(self):
-        return self.tape[self.pointer]
+    def current_symbol(self):
+        try:
+            return self.tape[self.pointer]
+        except Exception as e:
+            print(e)
+            return self.blankSymbol
+
+    def set_blank(self, blank):
+        self.blankSymbol = blank
+        if len(self.tape) > 0:
+            self.change_blank(blank)
 
 
 @dataclass
@@ -167,6 +176,7 @@ class TuringMachine:
     jsonTable: InitVar[dict[str, dict[str, str]] | None] = None
     tape: TuringTape = field(default_factory=TuringTape, init=True)
     log: list[str] = field(default_factory=list, init=False)
+    final_states: set[str] = field(default_factory=set, init=False)
 
     def fromJson(self, jsonTable):
         self.states, self.vars = self.transitionTable.make_table(jsonTable)
@@ -183,20 +193,27 @@ class TuringMachine:
         self.log.append(log)
 
     def run(self):
+        self.log = []
         active_state = "q0"
 
         # self.logg(active_state)
         isRunning = True
         while isRunning:
-            ic(active_state)
-            symbol = self.tape.currebt_symbol()
+            # ic(active_state)
+            symbol = self.tape.current_symbol()
             try:
                 active_state, repl, move = self.transitionTable.get_entry(
                     active_state, symbol
                 )
                 self.logg(active_state)
             except ValueError:
-                ic("DONE")
+                break
+            except KeyError:
+                break
+            except IndexError:
                 break
             isRunning = self.tape.exec(repl, move)
+
             # break
+        self.tape.accepted = not isRunning
+        return self.log, not isRunning
